@@ -1,0 +1,1 @@
+Hello! This is SnakyHand, a game where you have to avoid obstacles and canch suspicious yellow coins with your hand. The file with the game in question is main.py. Before starting to play, create a file next to the code called "comms.txt". This game cannot run yet if you haven't pip installed opencv and mediapipe.More is written in the game itself, have fun!
