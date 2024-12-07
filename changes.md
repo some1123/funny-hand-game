@@ -4,4 +4,7 @@ file Project 2.py and the main-part.py file in google collab with the mediapipe 
 if I try doing it in python it gets me an error:
 ImportError: DLL load failed while importing _framework_bindings
 
+2.12 - finally fixed my mediapipe
+Made both files in one, the wall for some reason won't get filled, gray wall collider bugged out
+
 
