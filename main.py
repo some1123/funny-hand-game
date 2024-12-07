@@ -11,7 +11,7 @@ class Wall:
         self.width = w
         self.breakable = breakable
         self.color = color
-        self.x = 640 #640x480
+        self.x = vwidth #640x480
         self.y = y
         self.open = False
 
@@ -53,7 +53,7 @@ class Coin:
         self.height = 30
         self.width = 30
         self.color = (255, 255, 0)
-        self.x = 640 #640x480
+        self.x = vwidth #640x480
         self.y = y
         self.open = False
 
@@ -71,6 +71,35 @@ class Coin:
 
     def check_collide(self):
         a = False
+        for i in get_points(results.multi_hand_landmarks[0].landmark, flippedRGB.shape):
+            if self.x <= i[0] <= self.x + self.width:
+                if self.y <= i[1] <= self.y + self.height:
+                    a = True
+        if a:
+            return True
+        else:
+            return False
+
+
+class AntiCheat:
+    def __init__(self, x, y, w, h, color):
+        self.height = h
+        self.width = w
+        self.color = color
+        self.x = x
+        self.y = y
+
+
+    def update(self):
+        check = self.check_collide()
+        if check is True:
+           send_death_request()
+
+
+    def check_collide(self):
+        a = False
+        if str(type(results.multi_hand_landmarks)) == "<class 'NoneType'>":
+            return False
         for i in get_points(results.multi_hand_landmarks[0].landmark, flippedRGB.shape):
             if self.x <= i[0] <= self.x + self.width:
                 if self.y <= i[1] <= self.y + self.height:
@@ -149,47 +178,63 @@ while True:
     print('You have to do this with your hand.')
     print('Some walls are gray and can be broken with a fist (you will see the circle around your hand turn green)')
     print('The game checks if the red is on the walls, so do not allow anyone hijack your controls :)')
+    print("By the way, you can pause by not having your hand in your camera's view.")
+    print('Be careful tho, only get outside or inside through the left side of the board.')
     print('Also, if you ignore the instuctions below, I will stick you in an infinite loop!')
     diff = input('Choose your difficulty (0-noob, 1-easy, 2-medium, 3-hard, 4-DOOM): ')
     if diff.isdigit() is True:
         if 0 <= int(diff) <= 4:
             diff = int(diff)
             if diff == 0:
-                max_gap = 120
-                min_gap = 100
                 spawn_timer = 100
             elif diff == 1:
-                max_gap = 100
-                min_gap = 80
                 spawn_timer = 80
-            elif diff == 2:
-                max_gap = 80
-                min_gap = 60
-                spawn_timer = 60
-            elif diff == 3:
-                max_gap = 60
-                min_gap = 40
+            elif diff == 2 or diff == 3:
                 spawn_timer = 60
             else:
-                max_gap = 40
-                min_gap = 20
                 spawn_timer = 30
             break
-max_gapspawn = 480 - max_gap
 #создаем детектор
 handsDetector = mp.solutions.hands.Hands()
 cap = cv2.VideoCapture(0)
 count = 0
 prev_fist = False
 finger_list = []
-wall_timer = spawn_timer
-coin_timer = int(spawn_timer * 1.5)
+wall_timer = 1
+coin_timer = int(spawn_timer * 0.5)
 walllist = []
+diff = int(diff)
+r = 0
+anti_cheat_list = []
 while(cap.isOpened()):
     ret, frame = cap.read()
     if cv2.waitKey(1) & 0xFF == ord('q') or not ret:
         break
     flipped = np.fliplr(frame)
+    vheight, vwidth = frame.shape[:2]
+    if diff == 0:
+        max_gap = vheight // 2
+        min_gap = vheight // 3
+    elif diff == 1:
+        max_gap = vheight // 3
+        min_gap = vheight // 4
+    elif diff == 2:
+        max_gap = vheight // 4
+        min_gap = vheight // 5
+    elif diff == 3:
+        max_gap = vheight // 5
+        min_gap = vheight // 6
+    else:
+        max_gap = vheight // 6
+        min_gap = vheight // 7
+    #Anti-cheat
+    if r == 0:
+        r = 1
+        anti_cheat_list.append(AntiCheat(0, 0, vwidth, 10, (255, 0, 0)))
+        anti_cheat_list.append(AntiCheat(0, vheight-10, vwidth, 10, (255, 0, 0)))
+        anti_cheat_list.append(AntiCheat(vwidth - 10, 0, 10, vheight, (255, 0, 0)))
+    # Gap calculations
+    max_gapspawn = vheight - max_gap
     # переводим его в формат RGB для распознавания
     flippedRGB = cv2.cvtColor(flipped, cv2.COLOR_BGR2RGB)
     # Распознаем
@@ -203,7 +248,7 @@ while(cap.isOpened()):
         cv2.drawContours(flippedRGB, [get_points(results.multi_hand_landmarks[0].landmark, flippedRGB.shape)], 0, (255, 0, 0), 2)
         (x, y), r = cv2.minEnclosingCircle(get_points(results.multi_hand_landmarks[0].landmark, flippedRGB.shape))
         ws = palm_size(results.multi_hand_landmarks[0].landmark, flippedRGB.shape)
-        if 2 * r / ws > 1.4:
+        if 2 * r / ws > 1.5:
              cv2.circle(flippedRGB,(int(x), int(y)), int(r), (0, 0, 255), 2)
              # кулак разжат
              prev_fist = False
@@ -220,15 +265,18 @@ while(cap.isOpened()):
             wall_timer = spawn_timer
             wallthick = rng.randint(10, 50)
             gapstart = rng.randint(10, max_gapspawn)
-            gaplen = rng.randint(60, 80)
+            gaplen = rng.randint(min_gap, max_gap)
             gapfull = rng.randint(0, 1)
             walllist.append(Wall(gapstart, wallthick, False, (0, 0, 255), 0))
-            walllist.append(Wall(530 - gapstart - gaplen, wallthick, False, (0, 0, 255), gapstart + gaplen))
+            walllist.append(Wall(vheight - gapstart - gaplen, wallthick, False, (0, 0, 255), gapstart + gaplen))
             if gapfull == 1:
                 walllist.append(Wall(gaplen, wallthick, True, (128, 128, 128), gapstart))
         if coin_timer == 0:
             coin_timer = spawn_timer
             walllist.append(Coin(rng.randint(30, 420)))
+    for i in anti_cheat_list:
+        i.update()
+        cv2.rectangle(flippedRGB, (i.x, i.y), (i.x + i.width, i.y + i.height), i.color, -1)
     #Walls drawn lmao
     for i in walllist:
         if not i.open:
@@ -247,3 +295,4 @@ while(cap.isOpened()):
 handsDetector.close()
 #Results
 print('You have scored ' + str(count) + ' points. Yay!')
+exit(32767)
